@@ -12,7 +12,7 @@ import numpy as np
 import logging
 import re
 import os
-# Configure logging
+from scipy.stats import iqr, ttest_rel, wilcoxon# Configure logging
 
 
 def log_file():
@@ -82,6 +82,65 @@ def summary_table(data, groupby_lst, summary_var):
 
     return summary_tbl
 
+
+
+def full_summary_table(df, groupby_cols):
+    """
+    Computes full summary: descriptive stats + paired tests + effect size.
+    
+    Returns a single DataFrame.
+    """
+
+    # Grouped stats for each variable
+    def grouped_stats(var):
+        return df.groupby(groupby_cols)[var].agg(['mean', 'std', 'median', iqr])
+
+    cost_true_stats = grouped_stats('cost_varma_true').rename(columns=lambda x: f"true_{x}")
+    cost_est_stats = grouped_stats('cost_varma_est').rename(columns=lambda x: f"est_{x}")
+    diff_stats = grouped_stats('abs_percent_diff').rename(columns=lambda x: f"diff_{x}")
+
+    # Merge all stats
+    summary = cost_true_stats.join([cost_est_stats, diff_stats])
+
+    # Add statistical test results
+    results = []
+    grouped = df.groupby(groupby_cols)
+    for group_key, group in grouped:
+        # Paired t-test
+        try:
+            t_pval = ttest_rel(group['cost_varma_est'], group['cost_varma_true']).pvalue
+        except Exception:
+            t_pval = None
+
+        # Wilcoxon test
+        try:
+            w_pval = wilcoxon(group['cost_varma_est'], group['cost_varma_true']).pvalue
+        except Exception:
+            w_pval = None
+
+        # Cohen’s d
+        diff = group['cost_varma_est'] - group['cost_varma_true']
+        pooled_std = diff.std()
+        d = diff.mean() / pooled_std if pooled_std > 0 else 0
+
+        results.append({
+            **{col: val for col, val in zip(groupby_cols, group_key)},
+            'pval_ttest': round(t_pval, 4) if t_pval is not None else None,
+            'pval_wilcoxon': round(w_pval, 4) if w_pval is not None else None,
+            "cohens_d": round(d, 3)
+        })
+
+    test_results_df = pd.DataFrame(results).set_index(groupby_cols)
+
+    # Combine all
+    final_summary = summary.join(test_results_df).reset_index()
+
+    # Round numeric columns
+    for col in final_summary.select_dtypes(include='number').columns:
+        if col not in ['pval_ttest', 'pval_wilcoxon', 'cohens_d']:
+            final_summary[col] = final_summary[col].round(2)
+
+    return final_summary
 
 def aggregate_autocorrelation_stats(all_results, max_lag=4):
     """

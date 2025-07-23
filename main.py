@@ -4,7 +4,8 @@ Created on Thu Jan  9 12:18:18 2025
 
 @author: Zhaleh
 """
-from evaluation.percentage_improvement_reports import run_config_directory, run_config_file, delta_c_est_single_run, delta_c_gain_single_run
+from evaluation.percentage_improvement_reports import run_config_directory, run_config_file, delta_c_gain_single_run
+from evaluation.param_estimation_err_impact import delta_c_est_single_run, run_config_directory as run_dir_est ,run_config_file as run_file_est
 from evaluation.cost_reports import compute_cost_config_directory, compute_cost_config_file
 from util.helper_func import create_table_summary_delta_c
 from data_prep.generate_varma_process import varma_data_generator
@@ -88,20 +89,20 @@ if __name__ == "__main__":
     # print("Total Cost:", tcost)
     # print("Forecast Performance:", forecast_performance)
     # Batch run of evaluation
-    n_run = 1
+    n_run = 200
 
     # Directory/File path
     directory_path = "inputs/json"
 
-    file_path = "inputs/json/4items_4-1_1_10.json"
+    file_path = "inputs/json/2items_4-1_1_10.json"
 
     # Delta C gain (VARMA vs ARMA inventory performance)
     # run_config_directory(delta_c_gain_single_run, directory_path, n_run)
     # run_config_file(delta_c_gain_single_run, file_path, n_run)
     
-    # Delta C est (VARMA true vs VARMA estimated inventory performance)
-    # run_config_directory(delta_c_est_single_run, directory_path, n_run)
-    # run_config_file(delta_c_est_single_run, file_path, n_run)
+    # Delta C est (VARMA true true vs VARMA estimated inventory performance)
+    # run_dir_est(delta_c_est_single_run, directory_path, n_run)
+    run_file_est(delta_c_est_single_run, file_path, n_run)
 
     # noise sensitivity analysis
     # noise_results = noise_level_sensitivity_batch_run(n_run)
@@ -115,7 +116,4 @@ if __name__ == "__main__":
     # costs analysis
     # cost_analysis_batch_run(n_run)
 
-    # Compute costs for a directory of configuration files
-    # compute_cost_config_directory(directory_path, n_run)    
-    # Compute costs for a single configuration file
-    compute_cost_config_file(file_path, n_run)
+    

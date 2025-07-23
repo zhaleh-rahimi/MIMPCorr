@@ -282,7 +282,7 @@ class varma_data_generator:
             p_value = acorr_ljungbox(noise[:, dim], lags=[10], return_df=True)['lb_pvalue'].iloc[0]
             if p_value < 0.05:  # Significant autocorrelation found
                 # print(f"Resampling dimension {dim} to remove serial correlation...")
-                return self.generate_uncorrelated_noise(mean, self.seed + 1 if self.seed else None)
+                return self.generate_uncorrelated_noise(mean, None)
 
         return noise
 

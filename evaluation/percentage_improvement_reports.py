@@ -20,20 +20,13 @@ def delta_c_gain_single_run(run_id, config):
     multi-period cost compared to independent ARMA models"""
     """Run a scenario based on a configuration file."""
 
-    steps = config["time_steps"]
-    k = config["num_products"]
-    sigma_base = 1  # config["noise_level"]
     model_order = config["model_order"]
     min_y = config["min_demand"]
-    # dependency = config["dependency"]
     cost_params = config["cost_params"]
-    max_rho = config['max_rho']
-    alpha = config['alpha']
+
     try:
         # Simulate data
-        varma_generator = varma_data_generator(
-            steps, k, sigma_base, model_order[0], model_order[1], min_y, max_rho, alpha
-        )
+        varma_generator = varma_data_generator(config=config, seed=run_id)
         data_fit, data_gen = varma_generator.generate_scenarios()
 
         improvement_results = []
@@ -64,22 +57,14 @@ def delta_c_est_single_run(run_id, config):
     multi-period cost compared to VARMA estimated models"""
     """Run a scenario based on a configuration file."""
 
-    steps = config["time_steps"]
-
-    k = config["num_products"]
-    sigma_base = 1  # config["noise_level"]
     model_order = config["model_order"]
     min_y = config["min_demand"]
-    # dependency = config["dependency"]
     cost_params = config["cost_params"]
-    max_rho = config['max_rho']
-    alpha = config['alpha']
+    
 
     try:
         # Simulate data
-        varma_generator = varma_data_generator(
-            steps, k, sigma_base, model_order[0], model_order[1], min_y, max_rho, alpha
-        )
+        varma_generator = varma_data_generator(config=config, seed=run_id)
         data_fit, data_gen = varma_generator.generate_scenarios()
 
         improvement_results = []
@@ -140,7 +125,7 @@ def run_config_file(func, file_path, n_run):
 
     # write summary table to an output file
     filename = f"{func.__name__}(x{n_run}runs)-Items={config['num_products']}-p={config['model_order'][0]}-q={config['model_order'][1]}.csv"
-    summary_tbl_path = f"data/output/{filename}"
+    summary_tbl_path = f"outputs/csv/{filename}"
     summary_tbl.to_csv(summary_tbl_path)
 
     # Calculate execution time

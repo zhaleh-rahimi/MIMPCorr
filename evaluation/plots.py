@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-results_df= pd.read_csv('../data/output/noise_level_sense(100).csv')
+results_df= pd.read_csv('../outputs/csv/noise_level_sense(100).csv')
 # Line plots for Noise Level   
 for metric in ["MAPE", "RMSE", "total_cost", "percentage_improvement"]:
     plt.figure()
@@ -18,5 +18,5 @@ for metric in ["MAPE", "RMSE", "total_cost", "percentage_improvement"]:
     plt.ylabel(metric)
     plt.legend(title="(p, q)", loc="best", bbox_to_anchor=(1, 1))
     # plt.grid(False)
-    plt.savefig(f'../data/figures/{metric}-rnd.pdf', format="pdf")
+    plt.savefig(f'../outputs/figures/{metric}-rnd.pdf', format="pdf")
     plt.show()

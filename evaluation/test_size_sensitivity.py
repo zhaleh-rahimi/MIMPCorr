@@ -51,10 +51,17 @@ def test_size_sensitivity_single_run(run_id):
         for p in range(1, 5):
             for q in range(2):
                 try:
+                    config = {
+                        "time_steps": steps,
+                        "num_products": k,
+                        "model_order": [p, q],
+                        "min_demand": min_y,
+                        "max_rho": max_rho[(p, q)],
+                        "alpha": alpha[(p, q)],
+                        "sigma_base": sigma_base
+                    }
                     # Simulate data
-                    varma_generator = varma_data_generator(
-                        steps, k, sigma_base, p, q, min_y, max_rho[(p, q)], alpha[(p, q)]
-                    )
+                    varma_generator = varma_data_generator(config=config, seed=run_id)
                     data_fit, data_gen = varma_generator.generate_scenarios()
                     title = f'Items=2, p={p}, q={q}, High Dependence'
                     df = {title: data_fit[title]}
@@ -116,7 +123,7 @@ def test_size_sensitivity_batch_run(n_run):
     #                                                                  "total_cost","percentage_improvement"])
     # write summary table to an output file
     filename = f"test_size_sens({n_run}).csv"
-    summary_tbl_path = f"data/output/{filename}"
+    summary_tbl_path = f"outputs/csv/{filename}"
     improvement_results.to_csv(summary_tbl_path)
 
     # Calculate execution time

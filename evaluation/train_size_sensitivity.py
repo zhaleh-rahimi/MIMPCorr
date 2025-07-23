@@ -37,8 +37,8 @@ def train_size_sensitivity_single_run(run_id):
     # Uncomment to run for 4 items
     k = 4
     cost_params = {
-        "holding_cost": [[10, 10,10, 10]],
-        "shortage_cost": [[10, 10,10, 10]]
+        "holding_cost": [[10, 10, 10, 10]],
+        "shortage_cost": [[10, 10, 10,  10]]
     }
     max_rho = {(1, 0): 0.8, (1, 1): 0.8, (2, 0): 0.7, (2, 1): 0.7,
                (3, 0): 0.7, (3, 1): 0.7, (4, 0): 0.65, (4, 1): 0.65}
@@ -54,10 +54,18 @@ def train_size_sensitivity_single_run(run_id):
         steps = train_size+test_size
         for p in range(1, 5):
             for q in range(2):
+                config = {
+                    "time_steps": steps,
+                    "num_products": k,
+                    "model_order": [p, q],
+                    "min_demand": min_y,
+                    "max_rho": max_rho[(p, q)],
+                    "alpha": alpha[(p, q)],
+                    "train_size": train_size,
+                    "test_size": test_size
+                }
                 # Simulate data
-                varma_generator = varma_data_generator(
-                    steps, k, sigma_base, p, q, min_y, max_rho[(p,q)], alpha[(p,q)]
-                )
+                varma_generator = varma_data_generator(config=config, seed=run_id)
                 data_fit, data_gen = varma_generator.generate_scenarios()
                 title = f'Items={k}, p={p}, q={q}, High Dependence'
                 df = {title: data_fit[title]}
@@ -109,7 +117,7 @@ def train_size_sensitivity_batch_run(n_run):
     #                                                                  "total_cost","percentage_improvement"])
     # write summary table to an output file
     filename = f"train_size_sens({n_run}).csv"
-    summary_tbl_path = f"data/output/{filename}"
+    summary_tbl_path = f"outputs/csv/{filename}"
     improvement_results.to_csv(summary_tbl_path)
 
     # Calculate execution time
@@ -132,7 +140,7 @@ def plot_error(results_df):
         plt.ylabel(metric)
         plt.legend(title="(p, q)", loc="best", bbox_to_anchor=(1, 1))
         plt.grid(color='gray', linestyle='-', linewidth=0.1)
-        plt.savefig(f'data/figures/{k}Items-{metric}-train-size.pdf', format="pdf")
+        plt.savefig(f'outputs/figures/{k}Items-{metric}-train-size.pdf', format="pdf")
         plt.show()
 
    

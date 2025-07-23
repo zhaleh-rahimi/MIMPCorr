@@ -55,10 +55,19 @@ def noise_sensitivity_single_run(run_id):
         for p in range(1, 5):
             for q in range(2):
                 try:
+                    config = {
+                        "time_steps": steps,
+                        "num_products": k,
+                        "model_order": [p, q],
+                        "min_demand": min_y,
+                        "noise_level": cov_noise,
+                        "max_rho": max_rho[(p, q)],
+                        "alpha": alpha[(p, q)],
+                        'model_order': [p, q]
+                    }
                     # Simulate data
-                    varma_generator = varma_data_generator(
-                        steps, k, cov_noise, p, q, min_y, max_rho[(p,q)], alpha[(p,q)]
-                    )
+                    varma_generator = varma_data_generator(config=config, seed=run_id)
+                    
                     data_fit, data_gen = varma_generator.generate_scenarios()
 
                     title = f'Items=2, p={p}, q={q}, High Dependence'
@@ -110,7 +119,7 @@ def noise_level_sensitivity_batch_run(n_run):
                                                                     "total_cost", "percentage_improvement"])
     # write summary table to an output file
     filename = f"noise_level_sense({n_run}).csv"
-    summary_tbl_path = f"data/output/{filename}"
+    summary_tbl_path = f"outputs/csv/{filename}"
     improvement_results.to_csv(summary_tbl_path)
 
     # Calculate execution time
@@ -137,7 +146,7 @@ def plot_error(results_df):
         plt.ylabel(metric)
         plt.legend(title="(p, q)", loc="best", bbox_to_anchor=(1, 1))
         plt.grid(color='gray', linestyle='-', linewidth=0.1)
-        plt.savefig(f'data/figures/{metric}-rnd.pdf', format="pdf")
+        plt.savefig(f'outputs/figures/{metric}-rnd.pdf', format="pdf")
         plt.show()
 
    

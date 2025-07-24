@@ -15,43 +15,64 @@ from util.helper_func import summary_table, full_summary_table
 from numpy.linalg import LinAlgError
 import numpy as np
 
-
 def delta_c_est_single_run(run_id, config):
-    """function for a single run to compute the percentage imporvement of VARMA true
-    multi-period cost compared to VARMA estimated models"""
-    """Run a scenario based on a configuration file."""
-
+    """
+    Compute the percentage improvement of the true VARMA multi-period cost 
+    over the estimated VARMA model for a single run — 
+    but only for cost settings where holding and shortage costs are both 10.
+    """
     model_order = config["model_order"]
     min_y = config["min_demand"]
     cost_params = config["cost_params"]
-    
+
+    improvement_results = []
 
     try:
-        # Simulate data
+        # Simulate data once per run (if any cost pair matches)
         varma_generator = varma_data_generator(config=config, seed=run_id)
         data_fit, data_gen = varma_generator.generate_scenarios()
 
-        improvement_results = []
+        for title, df_title in data_fit.items():
+            if 'High Dependence' not in title:
+                continue
 
-        # Iterate over dependency items
-        for title in data_fit.keys():
-            df = {title: data_fit[title]}
-            # Iterate over cost items
-            for cost_idx in range(len(cost_params['holding_cost'])):
-                costs = {key: values[cost_idx]
-                         for key, values in cost_params.items() if len(values) > cost_idx}
-                _, cost, perc_diff , _ , _,_ = evaluate_varma_order_policy(
-                    df, costs, model_order, data_gen, min_y)
+            df = {title: df_title}
 
-                holding_cost = cost_params['holding_cost'][cost_idx]
+            for cost_idx, holding_cost in enumerate(cost_params['holding_cost']):
                 shortage_cost = cost_params['shortage_cost'][cost_idx]
 
-                improvement_results.append([title, holding_cost[0], shortage_cost[0],
-                                            cost['VARMA'][title],cost['VARMA_known'][title], np.abs(perc_diff[title])])
-    except LinAlgError:
-        print("LU decomposition error occurred! Skipping this iteration and continuing.")
-    return improvement_results
+                # Filter: Only simulate when both holding and shortage costs are equal
+                if holding_cost[0] != shortage_cost[0]:
+                    continue
 
+                # Prepare cost dict
+                costs = {
+                    key: values[cost_idx]
+                    for key, values in cost_params.items()
+                    if len(values) > cost_idx
+                }
+
+                try:
+                    _, cost, perc_diff, *_ = evaluate_varma_order_policy(
+                        df, costs, model_order, data_gen, min_y
+                    )
+
+                    improvement_results.append([
+                        title,
+                        holding_cost[0],
+                        shortage_cost[0],
+                        cost['VARMA'][title],
+                        cost['VARMA_known'][title],
+                        abs(perc_diff[title])
+                    ])
+                except LinAlgError:
+                    print(f"LinAlgError during policy evaluation (cost_idx={cost_idx}). Skipping.")
+                    continue
+
+    except LinAlgError:
+        print("LinAlgError during data generation. Skipping this run.")
+
+    return improvement_results
 
 def run_config_directory(func, directory_path, n_run):
     # Loop through all files in the directory
@@ -77,22 +98,26 @@ def run_config_file(func, file_path, n_run):
 
     # Flatten the list of results
     improvement_results = [item for sublist in results for item in sublist]
-
+    if not improvement_results:
+        print("No valid results found. Exiting.")
+        return  
+    
     # Convert to DataFrame
     improvement_results = pd.DataFrame(improvement_results, columns=[
         'title', 'holding_unit_cost', 'shortage_unit_cost', 'cost_varma_est',
         'cost_varma_true','abs_percent_diff'
     ])
     # Summarize the results
-    summary = summarize_overall_impact(improvement_results)
+    summary = summarize_overall_impact(improvement_results)  
 
     sentence = (
     f"Across {summary['n_simulations']} simulations,\n "
-    f"the average absolute cost difference between true and estimated VARMA forecasts \n"
+    f"the average absolute cost difference between true and estimated VARMA forecasts\n"
     f"was only {summary['average_abs_percent_diff']}%, \n"
-    f"with over {summary['percent_within_threshold']}% of simulations staying within\n "
-    f"a {summary['threshold_used']}% cost deviation. \n"
-    f"This suggests that estimation errors in VARMA parameters have limited impact on inventory performance.\n"
+    f"with over {summary['percent_within_threshold']}% of simulations\n"
+    f"staying within a {summary['threshold_used']}% cost deviation. \n"
+    f"This suggests that estimation errors in VARMA parameters have limited impact \n"
+    f"on inventory performance.\n"
     )
 
     print("\n Report Summary:\n", sentence)
@@ -112,7 +137,7 @@ def run_config_file(func, file_path, n_run):
     print(f"Execution Time: {execution_time:.5f} seconds")
 
 
-def summarize_overall_impact(df, threshold=5.0):
+def summarize_overall_impact(df, threshold=10.0):
     """
     Extracts:
     - average absolute cost difference

@@ -1,0 +1,13 @@
+{
+    "num_products": 16,
+    "noise_level": 1,
+    "time_steps": 2000,
+    "model_order": [1, 0],
+    "min_demand": 10,
+    "max_rho":0.6,
+    "alpha":0.3,
+    "cost_params": {
+        "shortage_cost": [[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10]],
+        "holding_cost": [[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10]]
+    }
+}

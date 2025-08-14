@@ -30,7 +30,8 @@ def delta_c_gain_single_run(run_id, config):
         data_fit, data_gen = varma_generator.generate_scenarios()
 
         improvement_results = []
-
+        test_size =100
+        train_size = data_fit[list(data_fit.keys())[0]].shape[0]-test_size
         # Iterate over dependency items
         for title in data_fit.keys():
             print(title)
@@ -40,7 +41,7 @@ def delta_c_gain_single_run(run_id, config):
                 costs = {key: values[cost_idx]
                          for key, values in cost_params.items() if len(values) > cost_idx}
                 percentage_improvement, _,  _, _,_,_ = evaluate_varma_order_policy(
-                    df, costs, model_order, data_gen, min_y)
+                    df, costs, model_order, data_gen, min_y,train_size)
 
                 holding_cost = cost_params['holding_cost'][cost_idx]
                 shortage_cost = cost_params['shortage_cost'][cost_idx]

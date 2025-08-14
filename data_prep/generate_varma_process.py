@@ -27,17 +27,24 @@ class varma_data_generator:
         self.sigma_u = np.eye(self.k) * self.sigma_base
         self.base_coeff = self.sigma_base / self.min_y
         
-        self.seed = seed
+        self.seed = seed if seed is not None else np.random.seed(seed)
+
+    def get_conditional_mean(self, theta, phi, U):
+        _, mu = self.generate_varma_adjusted(
+            theta, phi, U, title="mu")
+        return mu
 
     def generate_scenarios(self):
         """ Wrapper to Generate Scenarios
             output: dictionary of VARMA process, VARMA process without noise with scenario title , 
             strong, medium and low dependence
         """
-
+    
         results = {}
         results_pred = {}
         k, p, q = self.k, self.p, self.q
+        # Generate multivariate normal noise with mu=0 and Sigma=I
+        U = self.generate_uncorrelated_noise(np.zeros(k), self.seed)
 
         # High Dependence Scenario
         cov_high = self.generate_high_dependence_cov(self.max_rho, self.alpha)
@@ -48,7 +55,7 @@ class varma_data_generator:
         theta_matrices = self.generate_theta_matrices(k, q)
 
         Y_high, pred_high = self.generate_varma_adjusted(
-            phi_matrices_high, theta_matrices, title_high)
+            phi_matrices_high, theta_matrices, U, title_high)
 
         results[title_high] = Y_high
         results_pred[title_high] = pred_high
@@ -66,13 +73,13 @@ class varma_data_generator:
 
             title = f"Items={k}, p={p}, q={q}, {strength_name}"
             Y, pred = self.generate_varma_adjusted(
-                phi_matrices, theta_matrices, title)
+                phi_matrices, theta_matrices,U, title)
             results[title] = Y
             results_pred[title] = pred
 
         return results, results_pred
 
-    def generate_high_dependence_cov(self, max_rho, alpha):
+    def generate_high_dependence_cov(self, max_rho, alpha, reverse=False):
         """
         Generate a high-dependence covariance structure.
         """
@@ -81,15 +88,17 @@ class varma_data_generator:
             np.eye(self.k) * max_rho*self.sigma_base
 
         matrix = [phi1 * (max_rho * alpha**(i)) for i in range(self.p)]
+        if reverse:
+            matrix = [phi1 * (max_rho * alpha**(i)) for i in reversed(range(self.p))]
         return np.array(matrix)
-
+    
     def reduce_dependence(self, base_matrix, factor):
         reduced_matrix = base_matrix * factor  # Handles element-wise scaling
         np.fill_diagonal(reduced_matrix, np.diag(base_matrix))  # Restore diagonals
 
         return reduced_matrix
 
-    def generate_varma_adjusted(self, ar_matrices, ma_matrices, title):
+    def generate_varma_adjusted(self, ar_matrices, ma_matrices, U,title):
         """ Wrapper of a VARMA process generation
         Considering the adjusted coeeficients, and enforced stationarity to process
         output: Adjusted VARMA process , and VARMA process without noise"""
@@ -100,14 +109,14 @@ class varma_data_generator:
             ma_matrices, check_invertibility_MA) if self.q > 0 else []
 
         # Generate VARMA process
-        Y, pred = self.generate_varma(ar_matrices, ma_matrices)
+        Y, pred = self.generate_varma(ar_matrices, ma_matrices, U)
 
         # Check invertibility for VMA
         is_invertible = check_invertibility_MA(ma_matrices) if self.q > 0 else True
 
         # Enforce stationarity if needed
         Y, pred, ar_matrices, is_stationary = self.enforce_stationarity_adf(
-            Y, pred, ar_matrices, ma_matrices, title)
+            Y, pred, ar_matrices, ma_matrices, U, title)
         if not is_stationary:
             print(f"Warning: Unable to enforce stationarity for {title}.")
 
@@ -126,19 +135,16 @@ class varma_data_generator:
 
         return Y, pred
 
-    def generate_varma(self, ar_matrices, ma_matrices, seed=None):
+    def generate_varma(self, ar_matrices, ma_matrices, U):
         """Generate VARMA Process (output: process, and process without noise)"""
         k, p, q, steps = self.k, self.p, self.q, self.steps
 
         Y = np.zeros((steps, k))
         pred = np.zeros((steps, k))
-
-        if seed is not None:
-            np.random.seed(seed)
-
+        
         # Generate multivariate normal noise with mu=0 and Sigma=I
-        mean = np.zeros(k)
-        U = self.generate_uncorrelated_noise(mean, self.seed)
+        # mean = np.zeros(k)
+        # U = self.generate_uncorrelated_noise(mean, self.seed)
 
         Y[:(max(p, q))] = U[:(max(p, q))]
         for t in range(max(p, q), steps):
@@ -286,7 +292,7 @@ class varma_data_generator:
 
         return noise
 
-    def enforce_stationarity_adf(self, Y, pred,  ar_matrices, ma_matrics, title, scaling_factor=0.97, max_attempts=1e3):
+    def enforce_stationarity_adf(self, Y, pred,  ar_matrices, ma_matrics, U, title, scaling_factor=0.97, max_attempts=1e3):
         """
         Modify AR coefficients to enforce stationarity based on the ADF test results.
 
@@ -319,7 +325,7 @@ class varma_data_generator:
             ar_matrices = [phi * scaling_factor for phi in ar_matrices]
 
             # Regenerate the process with adjusted coefficients
-            Y, pred = self.generate_varma(ar_matrices, ma_matrics)
+            Y, pred = self.generate_varma(ar_matrices, ma_matrics, U)
             attempts += 1
 
         print(f"Failed to enforce stationarity after {max_attempts} attempts for {title}.")
@@ -328,17 +334,21 @@ class varma_data_generator:
     def enforce_positivity(self, Y, pred):
         """ Demands should always be non-negative, this function enforces non-negativity by 
         shifting the generated demand towards positive values"""
-        # Compute column-wise minimums for Y and pred
-        min_Y = np.min(Y, axis=0)
-        min_pred = np.min(pred, axis=0)
+        # # Compute column-wise minimums for Y and pred
+        # min_Y = np.min(Y, axis=0)
+        # min_pred = np.min(pred, axis=0)
 
-        # Determine shifts for columns where positivity needs to be enforced
-        shifts = np.maximum(0, -(np.maximum(min_Y, min_pred)) + self.min_y)
+        # # Determine shifts for columns where positivity needs to be enforced
+        # shifts = np.maximum(0, -(np.maximum(min_Y, min_pred)) + self.min_y)
 
-        # Apply the shifts to all rows for each column
-        Y_new = Y + shifts
-        pred_new = pred + shifts
+        # # Apply the shifts to all rows for each column
+        # Y_new = Y + shifts
+        # pred_new = pred + shifts
 
+        pred_new = np.clip(pred, a_min=0, a_max=None)  # Ensure predictions are non-negative
+        Y_new = np.clip(Y, a_min=0, a_max=None)  # Ensure generated demands are non-negative
+        pred_new += self.min_y  # Shift predictions per congiguration
+        Y_new += self.min_y  # Shift generated demands per congiguration
         return Y_new, pred_new
 
     def save_scenario_results(self, scenario, ar_matrices, ma_matrices, stationary, invertible, autocor_matrices):
@@ -361,3 +371,18 @@ class varma_data_generator:
 
     def get_scenario_results(self):
         return self.scenario_results
+
+    def get_scenario_by_title(self, title, return_all=False):
+        """Return the row(s) where Scenario == title.
+       If return_all=False, returns the latest match as a dict (or None if not found).
+       If return_all=True, returns a list of dicts for all matches."""
+        df = self.scenario_results
+        matches = df.loc[df["Scenario"].astype(str) == str(title)]
+
+        if matches.empty:
+            return None
+
+        if return_all:
+            return matches.to_dict(orient="records")   # all matches
+        else:
+            return matches.iloc[-1].to_dict()          # latest match only

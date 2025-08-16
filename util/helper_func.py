@@ -12,7 +12,7 @@ import numpy as np
 import logging
 import re
 import os
-from scipy.stats import iqr, ttest_rel, wilcoxon# Configure logging
+from scipy.stats import iqr, ttest_rel, wilcoxon,t
 
 
 def log_file():
@@ -125,9 +125,9 @@ def full_summary_table(df, groupby_cols):
 
         results.append({
             **{col: val for col, val in zip(groupby_cols, group_key)},
-            'pval_ttest': round(t_pval, 4) if t_pval is not None else None,
-            'pval_wilcoxon': round(w_pval, 4) if w_pval is not None else None,
-            "cohens_d": round(d, 3)
+            # 'pval_ttest': round(t_pval, 4) if t_pval is not None else None,
+            # 'pval_wilcoxon': round(w_pval, 4) if w_pval is not None else None,
+            # "cohens_d": round(d, 3)
         })
 
     test_results_df = pd.DataFrame(results).set_index(groupby_cols)
@@ -259,3 +259,136 @@ def create_table_summary_delta_c(folder_path):
     pivot_table.to_csv(output_file)
     
     print(f"Summary table saved to {output_file}")
+
+def _tcrit(n: int, alpha: float = 0.05) -> float:
+    """Return t critical value for n-1 degrees of freedom and alpha significance level."""
+    return t.ppf(1 - alpha / 2, df=n - 1) if n > 1 else float("nan")
+
+def _mean_se_ci(x: pd.Series, alpha: float = 0.05) -> dict:
+    """Return mean, SE, and t-based 95% CI for a numeric Series."""
+    x = pd.to_numeric(x, errors="coerce").dropna()
+    n = int(x.shape[0])
+    mean = float(x.mean()) if n else float("nan")
+    se = float(x.std(ddof=1) / np.sqrt(n)) if n > 1 else 0.0
+    h = _tcrit(n, alpha) * se if n > 1 else 0.0
+    return {"mean": mean, "se": se, "ci_low": mean - h, "ci_high": mean + h, "n": n}
+
+
+def _agg_ci(g: pd.DataFrame, col: str, prefix: str = None) -> pd.Series:
+    """Compute mean/SE/CI for a column in a group and return with prefixed keys."""
+    stats = _mean_se_ci(g[col])
+    pre = (prefix or col)
+    return pd.Series({
+        f"{pre}_mean": stats["mean"],
+        f"{pre}_se": stats["se"],
+        f"{pre}_ci_low": stats["ci_low"],
+        f"{pre}_ci_high": stats["ci_high"],
+        f"{pre}_n": stats["n"],
+    })
+
+
+from typing import Optional, Dict, Any
+
+
+def epsilon_cap_from_A(A1: np.ndarray, safety: float = 0.5) -> Dict[str, Any]:
+    """
+    Safe epsilon for multiplicative, elementwise perturbations of A1:
+        A1_hat = A1 ∘ (1 + ε * N),  N_ij ~ N(0,1)
+    Uses the conservative bound: |ε| < m / (kappa(V) * ||A1||_F),
+    where m = 1 - ρ(A1), and V are right eigenvectors of A1.
+
+    Args:
+        A1: (k x k) AR(1) coefficient matrix.
+        safety: extra shrink factor (0 < safety ≤ 1) for reporting (default 0.5).
+
+    Returns:
+        dict with rho, margin m, ||A1||_F, κ(V), eps_cap, eps_safe.
+    """
+    A1 = np.asarray(A1, dtype=float)
+    # Spectral radius & margin
+    evals, V = np.linalg.eig(A1)
+    rho = float(np.max(np.abs(evals)))
+    m = max(1.0 - rho, 0.0)
+
+    # Frobenius norm
+    fro = float(np.linalg.norm(A1, ord="fro"))
+
+    # Condition number of eigenvector matrix V (Bauer–Fike factor)
+    try:
+        kappa = float(np.linalg.cond(V))
+        if not np.isfinite(kappa):
+            kappa = np.inf
+    except np.linalg.LinAlgError:
+        kappa = np.inf  # treat defective case as extremely ill-conditioned
+
+    # Bound and safe recommendation
+    eps_cap = 0.0 if (fro == 0.0 or m <= 0.0 or not np.isfinite(kappa) or kappa == 0.0) else m / (kappa * fro)
+    eps_safe = safety * eps_cap
+
+    return {
+        "rho_A1": rho,
+        "margin_m": m,
+        "fro_A1": fro,
+        "kappa_V": kappa,
+        "eps_cap": eps_cap,     # theoretical cap
+        "eps_safe": eps_safe,   # safety-scaled (recommendation)
+        "safety": safety,
+    }
+
+def invertibility_margin_B(B1: Optional[np.ndarray]) -> Optional[Dict[str, float]]:
+    """
+    For Θ(z) = I + B1 z (MA(1)), invertibility requires all roots |z|>1,
+    which is equivalent to ρ(B1) < 1. This reports ρ(B1) and its margin.
+    """
+    if B1 is None:
+        return None
+    B1 = np.asarray(B1, dtype=float)
+    rho = float(np.max(np.abs(np.linalg.eigvals(B1))))
+    return {"rho_B1": rho, "invertibility_margin": 1.0 - rho}
+
+# --- convenience wrapper for CONFIG using generator ---
+
+def epsilon_cap_from_config(config: dict,
+                            seed: int = 0,
+                            title_contains: str = "High Dependence",
+                            safety: float = 0.5) -> Dict[str, Any]:
+    """
+    Pulls A1 (and B1 if present) from varma_data_generator and computes ε caps.
+
+    Expects generator to expose:
+      - generate_scenarios() -> (data_fit, data_gen)
+      - get_scenario_by_title(title) -> dict with "AR Coefficients", "MA Coefficients"
+
+    Args:
+        config: your BASIC_CONFIG for VARMA(1,1) with num_products=2, max_rho=0.8, etc.
+        seed: RNG seed for reproducibility.
+        title_contains: substring to select the scenario title.
+        safety: extra shrink factor for the recommended epsilon.
+
+    Returns:
+        dict with A1/B1 info and epsilon bounds.
+    """
+    from data_prep.generate_varma_process import varma_data_generator
+
+    gen = varma_data_generator(config=config, seed=seed)
+    data_fit, _ = gen.generate_scenarios()
+
+    # Pick a scenario title
+    titles = list(data_fit.keys())
+    title = next((t for t in titles if title_contains in t), (titles[0] if titles else None))
+    if title is None:
+        raise RuntimeError("No scenarios returned by generator.")
+
+    row = gen.get_scenario_by_title(title)
+    A_list = [np.array(A, dtype=float) for A in row.get("AR Coefficients", [])]
+    B_list = [np.array(B, dtype=float) for B in row.get("MA Coefficients", [])]
+    if not A_list:
+        raise RuntimeError("Generator did not return AR Coefficients.")
+    A1 = A_list[0]
+    B1 = B_list[0] if B_list else None
+
+    out = {"title": title, "A1": A1, "B1": B1}
+    out.update(epsilon_cap_from_A(A1, safety=safety))
+    out["ma_invertibility"] = invertibility_margin_B(B1)
+    return out
+

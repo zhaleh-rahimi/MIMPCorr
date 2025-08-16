@@ -18,71 +18,31 @@ from evaluation.controlled_est_error import estimation_error_batch_run, estimati
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.statespace.varmax import VARMAX
-from pathlib import Path
-from util.io import load_data, write_output
-from util.paths import ensure_path
-from util.logging import setup_logging
+import argparse
 
 
-def load_data(file_path: str) -> pd.DataFrame:
-    # path = Path(file_path)
-    df = pd.read_csv(file_path, index_col=0, engine="python")
-    return df
-    
-def find_best_varma_order(data, max_p=5, max_q=3):
-    """
-    Find the best VARMA order based on AIC.
-    """
-    best_aic = float('inf')
-    best_order = [1, 0]
-    
-    for p in range(1,max_p + 1):
-        for q in range(max_q + 1):
-            try:
-                model = VARMAX(data, order=(p, q))
-                fitted_model = model.fit(disp=False)
-                if fitted_model.aic < best_aic:
-                    best_aic = fitted_model.aic
-                    best_order = [p, q]
-            except Exception as e:
-                print(f"Error fitting VARMA({p},{q}): {e}")
-    print(f"Best VARMA order: {best_order} with AIC: {best_aic}")
-    return best_order   
-
-def inventory_optimization_single_run():
-    """function for a single run to compute multi-period cost"""
-    """Run a scenario based on a configuration file."""
-    
-    data = np.array(load_data(file_path='inputs/global_weekly_demand_group1.csv'))
-    steps = 500
-    k = 3
-    min_y = np.mean(data)  # Minimum demand threshold for the VARMA process
-    model_order = find_best_varma_order(data-min_y)
-   
-
-    costs = {
-        "holding_cost": [1, 1,1],
-        "shortage_cost": [1, 1,1]
-    }
-    # max_rho = 0.73
-    # alpha = 0.25
-    # sigma_base = 1
-    # # Simulate data
-    # varma_generator = varma_data_generator(
-    #     steps, k, sigma_base, model_order[0], model_order[1], min_y, max_rho, alpha
-    # )
-    # data_fit, data_gen = varma_generator.generate_scenarios()
-    # scenario_results = varma_generator.get_scenario_results()
-
-    # key = f"Items={k}, p={model_order[0]}, q={model_order[1]}, High Dependence"
-    # df = {key: data_fit[key]}
-   
-    df = {"Items=3 p=4, q=1, High Dependence": data}
-    delta_c_gain, cost, delta_c_est, forecast_performance,h_cost,s_cost = evaluate_varma_order_policy(
-        df, costs, model_order, df, min_y)
-
-    return delta_c_gain, cost,  forecast_performance
-
+def main(experiment_type, directory_path = "inputs/json", file_path ="inputs/json/2items_2-0_1_10.json", n_run=200):
+    try:
+        if experiment_type == "delta_c_gain":
+            run_config_directory(delta_c_gain_single_run, directory_path, n_run)
+        if experiment_type == "practical_err_impact":
+            run_config_directory(delta_c_gain_single_run, directory_path, n_run)
+        if experiment_type == "noise_sensitivity":
+            # noise sensitivity analysis
+            noise_level_sensitivity_batch_run(n_run)
+        if experiment_type == "train_size_sensitivity":
+            # Train size sensitivity analysis
+            train_size_sensitivity_batch_run(n_run)
+        if experiment_type == "cost_analysis":            
+            # costs analysis
+            cost_analysis_batch_run(n_run)
+        if experiment_type == "controlled_err_impact":
+            # Controlled estimation error impact analysis
+            estimation_error_batch_run(n_run)          
+            
+            
+    except Exception as e:
+        print(e)
 
 # Usage
 if __name__ == "__main__":
@@ -93,7 +53,7 @@ if __name__ == "__main__":
     # print("Total Cost:", tcost)
     # print("Forecast Performance:", forecast_performance)
     # Batch run of evaluation
-    n_run = 200
+    n_run = 3
 
     # Directory/File path
     directory_path = "inputs/json"
@@ -102,7 +62,7 @@ if __name__ == "__main__":
 
     # Delta C gain (VARMA vs ARMA inventory performance)
     # run_config_directory(delta_c_gain_single_run, directory_path, n_run)
-    run_config_file(delta_c_gain_single_run, file_path, n_run)
+    # run_config_file(delta_c_gain_single_run, file_path, n_run)
     
     # Delta C est (VARMA true true vs VARMA estimated inventory performance)
     # run_dir_est(delta_c_est_single_run, directory_path, n_run)

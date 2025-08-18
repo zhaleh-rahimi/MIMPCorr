@@ -26,8 +26,8 @@ def perform_adfuller_test(Y, title):
     for i in range(Y.shape[1]):
         result = adfuller(Y[:, i])
         # print(
-        #     f"Process {i + 1}: p-value = {result[1]:.4f} (Stationary? {'Yes' if result[1] < 0.05 else 'No'})")
-
+            # f"Process {i + 1}: p-value = {result[1]:.4f} (Stationary? {'Yes' if result[1] < 0.05 else 'No'})")
+    return all(result[1] < 0.05 for result in [adfuller(Y[:, i]) for i in range(Y.shape[1])])
 
 def check_stationarity_AR(phi_matrices):
     """Stationarity Check for AR part"""
@@ -97,3 +97,5 @@ def relative_noise_dispersion(mu_Y, Sigma_epsilon):
     overall_dispersion = trace_sigma / norm_mu_Y if norm_mu_Y != 0 else np.nan  # Avoid division by zero
 
     return overall_dispersion, dispersion_vector
+
+

@@ -271,7 +271,7 @@ def _mean_se_ci(x: pd.Series, alpha: float = 0.05) -> dict:
     mean = float(x.mean()) if n else float("nan")
     se = float(x.std(ddof=1) / np.sqrt(n)) if n > 1 else 0.0
     h = _tcrit(n, alpha) * se if n > 1 else 0.0
-    return {"mean": mean, "se": se, "ci_low": mean - h, "ci_high": mean + h, "n": n}
+    return {"mean": mean, "interval": h,"se": se, "ci_low": mean - h, "ci_high": mean + h, "n": n}
 
 
 def _agg_ci(g: pd.DataFrame, col: str, prefix: str = None) -> pd.Series:
@@ -280,6 +280,7 @@ def _agg_ci(g: pd.DataFrame, col: str, prefix: str = None) -> pd.Series:
     pre = (prefix or col)
     return pd.Series({
         f"{pre}_mean": stats["mean"],
+        f"{pre}_interval": stats["interval"],
         f"{pre}_se": stats["se"],
         f"{pre}_ci_low": stats["ci_low"],
         f"{pre}_ci_high": stats["ci_high"],

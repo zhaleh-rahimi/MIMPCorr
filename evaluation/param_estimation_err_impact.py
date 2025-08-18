@@ -10,7 +10,6 @@ from numpy.linalg import LinAlgError
 
 from data_prep.generate_varma_process import varma_data_generator
 from evaluation.evaluate_varma_order_policy import evaluate_varma_order_policy
-from util.helper_func import full_summary_table
 from util.helper_func import _mean_se_ci as ci_stats
 
 # ---------- helpers ----------
@@ -35,24 +34,18 @@ def summarize_with_ci(df: pd.DataFrame, keys=None) -> pd.DataFrame:
             ("cost_varma_est",  "Cest"),
             ("diff_pct_signed", "DiffPct"),
             ("diff_pct_abs",    "AbsDiff"),
-            ("ratio_est_over_true", "Ratio"),
+            ("mape_est",        "mape_est"),
+            ("mape_true",       "mape_true"),
+            ("diff_pct_signed_shortage", "DiffPctShortage"),
+            ("diff_pct_signed_holding", "DiffPctHolding")
         ]:
             s = ci_stats(g[col])
-            rec.update({f"{pref}_{m}": s[m] for m in ("n","mean","se","ci_low","ci_high")})
+            rec.update({f"{pref}_{m}": s[m] for m in ("n","mean","interval","se","ci_low","ci_high")})
         rows.append(rec)
 
     out = pd.DataFrame(rows)
     return out.sort_values(key_cols).reset_index(drop=True) if key_cols else out
 
-def add_relative_cols(df: pd.DataFrame) -> pd.DataFrame:
-    eps = 1e-12
-    denom = np.maximum(df["cost_varma_true"].astype(float), eps)
-    df = df.copy()
-    df["diff_abs"] = df["cost_varma_est"] - df["cost_varma_true"]
-    df["diff_pct_signed"] = 100.0 * df["diff_abs"] / denom
-    df["diff_pct_abs"] = df["diff_pct_signed"].abs()
-    df["ratio_est_over_true"] = df["cost_varma_est"] / denom
-    return df
 
 def slug(s: str) -> str:
     return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in str(s))
@@ -73,7 +66,11 @@ def delta_c_est_single_run(run_id: int, config: dict):
         data_fit, data_gen = gen.generate_scenarios()
         model_order = config["model_order"]
         min_y = config["min_demand"]
-        cost_params = config["cost_params"]
+        k = config["num_products"]
+        cost_params = {
+            "holding_cost": [[10]*k,[10]*k,[10]*k],
+            "shortage_cost": [[2]*k,[10]*k,[50]*k],
+        }
 
         for title, df_title in data_fit.items():
             if "High Dependence" not in title: 
@@ -82,16 +79,26 @@ def delta_c_est_single_run(run_id: int, config: dict):
 
             for idx, h in enumerate(cost_params["holding_cost"]):
                 s = cost_params["shortage_cost"][idx]
-                if 5*h[0] != s[0]: 
-                    continue
+                # if h != s: 
+                #     continue
 
                 costs = {k: v[idx] for k, v in cost_params.items() if len(v) > idx}
                 try:
-                    _, cost, _, *_ = evaluate_varma_order_policy(df, costs, model_order, data_gen, min_y)
+                    _, cost, _, forecast_performance,h_cost,s_cost = evaluate_varma_order_policy(df, costs, model_order, data_gen, min_y)
                     C_est = float(cost["VARMA"][title]); C_true = float(cost["VARMA_known"][title])
+                    C_s_est = float(s_cost["VARMA"][title])
+                    C_h_est = float(h_cost["VARMA"][title])
+                    C_s_true = float(s_cost["VARMA_known"][title])
+                    C_h_true = float(h_cost["VARMA_known"][title])
+                    mape_est = float(forecast_performance["VARMA"][title]["mape"])
+                    mape_true = float(forecast_performance["VARMA_known"][title]["mape"])
                     denom = max(C_true, 1e-12)
+                    denom_s = max(C_s_true, 1e-12)
+                    denom_h = max(C_h_true, 1e-12)
                     d_signed = 100.0 * (C_est - C_true) / denom
-                    out.append([run_id, title, h[0], s[0], C_est, C_true, d_signed, abs(d_signed)])
+                    d_signed_s = 100.0 * (C_s_est - C_s_true) / denom_s
+                    d_signed_h = 100.0 * (C_h_est - C_h_true) / denom_h
+                    out.append([run_id, title, h[0], s[0], C_est, C_true, d_signed, abs(d_signed),d_signed_s, d_signed_h,mape_est, mape_true])
                 except LinAlgError:
                     # skip this (run, cost) if policy evaluation failed
                     continue
@@ -114,9 +121,8 @@ def run_config_file(func, file_path: str, n_run: int):
         print("No valid results."); return
 
     cols = ["run_id","title","holding_unit_cost","shortage_unit_cost",
-            "cost_varma_est","cost_varma_true","diff_pct_signed","diff_pct_abs"]
-    df = add_relative_cols(pd.DataFrame(rows, columns=cols))
-
+            "cost_varma_est","cost_varma_true","diff_pct_signed","diff_pct_abs","diff_pct_signed_shortage","diff_pct_signed_holding","mape_est","mape_true"]
+    df = pd.DataFrame(rows, columns=cols) 
     # ---- CI summaries ----
     overall = summarize_with_ci(df)  # whole df
     by_title_cost = summarize_with_ci(df, ["title","holding_unit_cost","shortage_unit_cost"])
@@ -130,15 +136,9 @@ def run_config_file(func, file_path: str, n_run: int):
     )
 
     # ---- CSVs ----
-    # panel_csv = f"outputs/csv/{tag}-panel.csv"; df.to_csv(panel_csv, index=False)
-    by_tc_csv = f"outputs/csv/{tag}-by_title_cost_CI.csv"; by_title_cost.to_csv(by_tc_csv, index=False)
+    by_tc_csv = f"outputs/csv/{tag}-by_title_cost_CI.csv"; 
+    by_title_cost.to_csv(by_tc_csv, index=False)
     
-    legacy_csv = f"outputs/csv/{func.__name__}(x{n_run}runs)-Items={config['num_products']}-p={config['model_order'][0]}-q={config['model_order'][1]}.csv"
-    full_summary_table(
-        df.rename(columns={"diff_pct_abs":"abs_percent_diff"}),
-        ["title","holding_unit_cost","shortage_unit_cost"]
-    ).to_csv(legacy_csv, index=False)
-
     # ---- plots ----
     figs_tag = f"outputs/figures/{tag}"
 
@@ -151,7 +151,7 @@ def run_config_file(func, file_path: str, n_run: int):
     ax.set_title("Estimated vs True cost"); ax.grid(alpha=0.3)
     savefig(fig, f"{figs_tag}-scatter_true_vs_est.png")
 
-    # print("\nSaved CSVs:\n ", panel_csv, "\n ", by_tc_csv, "\n ", by_t_csv, "\n ", by_c_csv, "\n ", legacy_csv)
+
     print(f"Elapsed: {time.time()-t0:.2f}s")
 
 def run_config_directory(func, dir_path: str, n_run: int):

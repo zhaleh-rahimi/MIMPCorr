@@ -75,10 +75,14 @@ def evaluate_varma_order_policy(data, cost_params, model_order, data_gen, min_de
                 raise ValueError("Unsupported model type")
 
             # Performance of model  on test data
-            mape = mean_absolute_percentage_error(
-                test.values, predictions[model_type].values, multioutput='raw_values')
-            rmse = root_mean_squared_error(
-                test.values, predictions[model_type].values, multioutput='raw_values')
+            diff = test.values- predictions[model_type].values
+            rmse = float(np.sqrt(np.mean(diff**2)))
+            mape = float(np.mean(np.abs(diff) / np.maximum(np.abs(test.values), 1e-8)))*100
+    
+            # mape = mean_absolute_percentage_error(
+            #     test.values, predictions[model_type].values, multioutput='raw_values')
+            # rmse = root_mean_squared_error(
+            #     test.values, predictions[model_type].values, multioutput='raw_values')
             forecast_performance[model_type][scenario]['mape'] = mape
             forecast_performance[model_type][scenario]['rmse'] = rmse
 
@@ -108,5 +112,5 @@ def evaluate_varma_order_policy(data, cost_params, model_order, data_gen, min_de
             cost["ARIMA"][scenario], cost["VARMA"][scenario])
         delta_c_est[scenario] = calculate_improvement_percentage(
             cost["VARMA"][scenario], cost["VARMA_known"][scenario])
-
+    
     return delta_c_gain, cost, delta_c_est, forecast_performance,h_cost,s_cost

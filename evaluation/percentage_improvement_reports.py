@@ -53,41 +53,6 @@ def delta_c_gain_single_run(run_id, config):
     return improvement_results
 
 
-def delta_c_est_single_run(run_id, config):
-    """function for a single run to compute the percentage imporvement of VARMA true
-    multi-period cost compared to VARMA estimated models"""
-    """Run a scenario based on a configuration file."""
-
-    model_order = config["model_order"]
-    min_y = config["min_demand"]
-    cost_params = config["cost_params"]
-    
-
-    try:
-        # Simulate data
-        varma_generator = varma_data_generator(config=config, seed=run_id)
-        data_fit, data_gen = varma_generator.generate_scenarios()
-
-        improvement_results = []
-
-        # Iterate over dependency items
-        for title in data_fit.keys():
-            df = {title: data_fit[title]}
-            # Iterate over cost items
-            for cost_idx in range(len(cost_params['holding_cost'])):
-                costs = {key: values[cost_idx]
-                         for key, values in cost_params.items() if len(values) > cost_idx}
-                _, _,  percentage_improvement, _ , _ , _ = evaluate_varma_order_policy(
-                    df, costs, model_order, data_gen, min_y)
-
-                holding_cost = cost_params['holding_cost'][cost_idx]
-                shortage_cost = cost_params['shortage_cost'][cost_idx]
-
-                improvement_results.append([title, holding_cost[0], shortage_cost[0],
-                                            percentage_improvement[title]])
-    except LinAlgError:
-        print("LU decomposition error occurred! Skipping this iteration and continuing.")
-    return improvement_results
 
 
 def run_config_directory(func, directory_path, n_run):

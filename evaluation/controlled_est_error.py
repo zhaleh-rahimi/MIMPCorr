@@ -28,7 +28,7 @@ COSTS = {
 }
 # Levels of parameter perturbation (controls uncertainty magnitude)
 info = epsilon_cap_from_config(BASE_CONFIG, seed=0, title_contains="High Dependence", safety=0.5)
-eps_rng = min(info["eps_safe"], 0.05)  # Cap for perturbation levels
+eps_rng = min(info["eps_safe"], 0.1)  # Cap for perturbation levels
 EPSILONS =np.linspace(-eps_rng, eps_rng, 6).tolist()
 # EPSILONS = [-0.05,-0.03, -0.01, 0.0, 0.01, 0.03, 0.05]  # Perturbation levels
 

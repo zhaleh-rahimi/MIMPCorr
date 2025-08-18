@@ -21,7 +21,7 @@ def fit_varma(train, test, p, q):
     # Predict (1-step ahead in-sample forecast)
     fitted_values = fitted_model.fittedvalues
     # Predict (1-step ahead out-of-sample forecast)
-    res = fitted_model.apply(test, refit=True)
+    res = fitted_model.extend(test, refit=True)
     predictions = res.fittedvalues
 
     return predictions, fitted_values

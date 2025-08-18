@@ -19,7 +19,7 @@ def fit_arima(train, test, p=1, q=1):
         # Predict (1-step ahead in-sample forecast)
         fitted[column] = fit.fittedvalues
         # Predict (1-step ahead out-of-sample forecast)
-        res = fit.apply(test[column], refit=True)
+        res = fit.extend(test[column])
         predictions[column] = res.fittedvalues
 
     return predictions, fitted

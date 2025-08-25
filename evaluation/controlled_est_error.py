@@ -26,13 +26,13 @@ COSTS = {
     "holding_cost": [10.0 for _ in range(BASE_CONFIG["num_products"])],
     "shortage_cost": [50.0 for _ in range(BASE_CONFIG["num_products"])],
 }
-# Levels of parameter perturbation (controls uncertainty magnitude)
-info = epsilon_cap_from_config(BASE_CONFIG, seed=0, title_contains="High Dependence", safety=0.5)
-eps_rng = min(info["eps_safe"], 0.1)  # Cap for perturbation levels
-EPSILONS =np.linspace(-eps_rng, eps_rng, 6).tolist()
-# EPSILONS = [-0.05,-0.03, -0.01, 0.0, 0.01, 0.03, 0.05]  # Perturbation levels
+# # Levels of parameter perturbation (controls uncertainty magnitude)
+# info = epsilon_cap_from_config(BASE_CONFIG, seed=0, title_contains="High Dependence", safety=0.5)
+# eps_rng = min(info["eps_safe"], 0.1)  # Cap for perturbation levels
+# EPSILONS =np.linspace(-eps_rng, eps_rng, 6).tolist()
+EPSILONS = [-0.1,-0.07,-0.05,-0.03, -0.01, 0.0, 0.01, 0.03, 0.05,0.07,0.1]  # Perturbation levels
 
-# ------------------------- utilities -------------------------
+# ------------------------- utilities ------------------------- 
 
 def compute_mu_from_params(
     U: np.ndarray,
@@ -201,8 +201,10 @@ def estimation_error_single_run(
                 DeltaC_pct= 100.0 * (C - C_true) / max(C_true, 1e-12),  # % change vs baseline cost
                 H_true=H_true,
                 H_est=H,
+                DeltaH_pct= 100.0 * (H - H_true) / max(H_true, 1e-12),  # % change vs baseline holding cost
                 S_true=S_true,
                 S_est=S,
+                DeltaS_pct= 100.0 * (S - S_true) / max(S_true, 1e-12),  # % change vs baseline shortage cost
                 rmse_mu=rmse,
                 bias_mu=bias,
                 mape_mu=mape,
@@ -262,8 +264,10 @@ def estimation_error_batch_run(
         
         rec.update(_agg_ci(g, "H_est", "H_est"))
         rec.update(_agg_ci(g, "H_true", "H_true"))
+        rec.update(_agg_ci(g, "DeltaH_pct", "DeltaH_pct"))
         rec.update(_agg_ci(g, "S_est", "S_est"))
         rec.update(_agg_ci(g, "S_true", "S_true"))
+        rec.update(_agg_ci(g, "DeltaS_pct", "DeltaS_pct"))
         rec.update(_agg_ci(g, "r2", "R2"))
         rows.append(rec)
 

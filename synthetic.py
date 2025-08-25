@@ -74,7 +74,7 @@ if __name__ == "__main__":
     # Directory/File path
     directory_path = "inputs/json"
 
-    file_path = "inputs/json/2items_1-1_1_10.json"
+    file_path = "inputs/json/6items_2-1_1_10.json"
 
     # Delta C gain (VARMA vs ARMA inventory performance)
     # run_config_directory(delta_c_gain_single_run, directory_path, n_run)
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     # run_file_est(delta_c_est_single_run, file_path, n_run)
 
     # Delta C est (VARMA true true vs ARMA estimated inventory performance)
-    # run_dir_arma_est(delta_c_est_single_run, directory_path, n_run)
+    # run_dir_arma_est(armaEst_varmaTrue_single_run, directory_path, n_run)
     # run_file_arma_est(armaEst_varmaTrue_single_run, file_path, n_run)
 
 
@@ -106,4 +106,4 @@ if __name__ == "__main__":
 
 
     #misspec sensitivity analysis
-    # misspec_batch_run(n_run)
+    misspec_batch_run(n_run)

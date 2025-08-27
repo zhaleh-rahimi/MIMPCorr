@@ -1,11 +1,3 @@
-# This cell writes a complete, ready-to-run Python script that:
-# - Loads M5 sales & calendar CSVs
-# - Aggregates daily item sales to weekly per item (optionally pooled across stores)
-# - Computes lagged cross-correlations and builds a similarity graph
-# - Forms clusters of 2–6 items based on correlation threshold
-# - Fits VAR (or VARMAX, if desired) within each cluster
-# - Computes rolling order-up-to inventory costs and compares vs. ARIMA-per-item baseline
-# - Saves outputs (clusters, costs) to CSV
 #
 # Place the M5 CSVs in /inputs before running:
 #   - /inputs/m5/sales_train_validation.csv
@@ -19,16 +11,6 @@
 # - The evaluation uses a rolling-origin split with periodic refits.
 # - You can adjust cost ratios, correlation thresholds, and cluster sizes at the CONFIG block.
 #
-# -----------------------------------------------------------------------------
-# M5 → Weekly → Correlation Clusters → VAR/VARMAX policy vs ARIMA baseline
-# -----------------------------------------------------------------------------
-# - Robust to sklearn>=1.2 (uses metric='precomputed')
-# - Uses SciPy's norm.ppf for fractile
-# - VARMAX fitting stabilized (diagonal innovations, multi-optimizer, get_forecast)
-# - Always returns mu/sigma (no UnboundLocalError)
-# - Guards for short windows, NaNs, scaling
-# - Saves clusters/correlations/results/plot to CONFIG["out_dir"]
-# -----------------------------------------------------------------------------
 
 import os
 import math

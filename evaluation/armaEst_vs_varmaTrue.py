@@ -85,12 +85,12 @@ def armaEst_varmaTrue_single_run(run_id: int, config: dict):
                 costs = {k: v[idx] for k, v in cost_params.items() if len(v) > idx}
                 try:
                     _, cost, _, forecast_performance,h_cost,s_cost = evaluate_varma_order_policy(df, costs, model_order, data_gen, min_y)
-                    C_est = float(cost["ARMA"][title]); C_true = float(cost["VARMA_known"][title])
-                    C_s_est = float(s_cost["ARMA"][title])
-                    C_h_est = float(h_cost["ARMA"][title])
+                    C_est = float(cost["ARIMA"][title]); C_true = float(cost["VARMA_known"][title])
+                    C_s_est = float(s_cost["ARIMA"][title])
+                    C_h_est = float(h_cost["ARIMA"][title])
                     C_s_true = float(s_cost["VARMA_known"][title])
                     C_h_true = float(h_cost["VARMA_known"][title])
-                    mape_est = float(forecast_performance["ARMA"][title]["mape"])
+                    mape_est = float(forecast_performance["ARIMA"][title]["mape"])
                     mape_true = float(forecast_performance["VARMA_known"][title]["mape"])
                     denom = max(C_true, 1e-12)
                     denom_s = max(C_s_true, 1e-12)

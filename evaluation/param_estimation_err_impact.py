@@ -40,7 +40,7 @@ def summarize_with_ci(df: pd.DataFrame, keys=None) -> pd.DataFrame:
             ("diff_pct_signed_holding", "DiffPctHolding")
         ]:
             s = ci_stats(g[col])
-            rec.update({f"{pref}_{m}": s[m] for m in ("n","mean","interval","se","ci_low","ci_high")})
+            rec.update({f"{pref}_{m}": s[m] for m in ("n","mean","sd","se","ci_low","ci_high")})
         rows.append(rec)
 
     out = pd.DataFrame(rows)

@@ -1,13 +1,12 @@
-# MIMPCorr: Ordering Policies for Multi-Item Multi-Period Inventory Systems with Correlated Demands
+# MIMPCorr: Multi-Item Multi-Period Correlated-aware Inventory Optimization
 
 
 ## Abstract
 
-We investigate optimal ordering policies for a multi-item periodic-review inventory system,
-considering demand correlations and historical data for the products involved. We extend
-inventory models by transitioning from an ARMA demand process to a VARMA framework,
-explicitly characterizing optimal ordering policies when there is both auto-correlation and
-cross-correlation among multiple items. Through experimental studies, we evaluate inventory
+This is a study on multi-item periodic-review inventory systems,
+considering stochastic demand with different types of correlations, including auto- and cross-correlation.
+We find the VARMA(p,q) models to be suitable structural frameworks to integrate dependencies for a tractable
+analysis of optimal ordering policies. Through experimental studies, we evaluate inventory
 costs and cost improvements compared to multi-item ordering policies where demands are
 assumed to be independent under different degrees of correlation, noise levels, and training
 data window sizes. The results show that, for moderate to high levels of dependence among
@@ -43,25 +42,9 @@ mimpio/
 ├── inputs                    # model configs and input data
 ├── outputs                   # outputs
 ├── util                      # helper and stat test scripts
-├── main.py                   # main script to run project
+├── synthetic.py              # main script to run project on synthetic data
+├── M5.py                     # script for empirical study on scalability
 ```
 
-## Reference
-This repository contains the source code to
-reproduce the experiments in our paper
-[Ordering Policies for Multi-Item Inventory Systems with Correlated Demands
-](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5209877).
-
-If you find this repository helpful in your publications,
-please consider citing our paper.
-
-```
-@inproceedings{rahimi2025inventory,
-  title={Ordering Policies for Multi-Item Inventory Systems with Correlated Demands},
-  author={Rahimi, Zhaleh and Down, Douglas and Li, Na and Arnold, Donald},
-  url={https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5209877},
-  year={2025}
-}
-```
 
 

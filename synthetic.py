@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     # Delta C gain (VARMA vs ARMA inventory performance)
     # run_config_directory(delta_c_gain_single_run, directory_path, n_run)
-    # run_config_file(delta_c_gain_single_run, file_path, n_run)
+    run_config_file(delta_c_gain_single_run, file_path, n_run)
     
     # Delta C est (VARMA true true vs VARMA estimated inventory performance)
     # run_dir_est(delta_c_est_single_run, directory_path, n_run)
@@ -102,8 +102,8 @@ if __name__ == "__main__":
     # cost_analysis_batch_run(n_run)
 
     # Controlled estimation error impact analysis
-    # estimation_error_batch_run(n_run)
+    estimation_error_batch_run(n_run)
 
 
     #misspec sensitivity analysis
-    misspec_batch_run(n_run)
+    # misspec_batch_run(n_run)

@@ -46,5 +46,59 @@ mimpio/
 ├── M5.py                     # script for empirical study on scalability
 ```
 
+# Inventory Experiments
+
+This repo has two entry points:
+
+* **M5 (real data):** Runs clustering + VAR/VARMA(X) forecasting on the M5 dataset and compares against ARIMA.
+* **Synthetic:** Controlled experiments testing cost improvements and sensitivity to noise, training size, and misspecification.
+
+---
+
+## Quick Start
+
+```bash
+# Setup
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+mkdir -p inputs/m5 inputs/json outputs/m5 outputs/synth
+
+# M5: place CSVs under inputs/m5/
+# Synthetic: place JSON configs under inputs/json/
+
+# Run M5 pipeline
+python m5.py
+
+# Run synthetic experiments
+python synthetic.py
+```
+
+---
+
+## Inputs
+
+* **M5:**
+
+  * `inputs/m5/sales_train_validation.csv`
+  * `inputs/m5/calendar.csv`
+* **Synthetic:** JSON configs (e.g., `inputs/json/2items_2-1_1_10.json`).
+
+---
+
+## Outputs
+
+* **M5:** clusters.csv, correlation matrix, cost results, summary.json, plots → `outputs/m5/`
+* **Synthetic:** experiment results/plots → `outputs/synth/`
+
+---
+
+## Config (edit in scripts)
+
+* `model_type`: "VAR" (default) or "VARMAX"
+* `p_order`, `q_order`: model lags
+* `rolling_window_weeks`, `test_weeks`: evaluation horizon
+* Cost ratios, thresholds, cluster sizes
+
+---
 
 

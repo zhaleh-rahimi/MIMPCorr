@@ -33,7 +33,7 @@ us to isolate and analyze the effect of demand dependencies in an idealized sett
 ## Project Structure
 
 ```
-mimpio/
+mimpcorr/
 
 ├── data_prep                 # synthetic data generation using VARMA process, and data preparation for other datasets
 ├── evaluation                # scripts to evaluate models

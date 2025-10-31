@@ -234,7 +234,7 @@ class varma_data_generator:
         for dim in range(n_dims):
             p_value = acorr_ljungbox(noise[:, dim], lags=[10], return_df=True)["lb_pvalue"].iloc[0]
             if p_value < 0.05:
-                # v1-like: bump the seed to change the RNG stream deterministically
+                
                 next_seed = (seed + 1) if (seed is not None) else None
                 return self.generate_uncorrelated_noise(mean, next_seed)
         return noise

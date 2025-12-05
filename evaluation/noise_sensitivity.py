@@ -19,41 +19,32 @@ from numpy.linalg import LinAlgError
 
 
 def noise_sensitivity_single_run(run_id):
-
+    
+    # initialize
     steps = 200
-    k = 2
-
-    model_order = [4, 1]
-    min_y = 10
-
+    k = 2    
+    min_y =10
     cost_params = {
         "holding_cost": [[1, 1]],
         "shortage_cost": [[1, 1]]
     }
-    max_rho = {(1, 0): 0.8, (1, 1): 0.8, (2, 0): 0.8, (2, 1): 0.8,
+    max_rho = {(1, 0): 0.85, (1, 1): 0.8, (2, 0): 0.8, (2, 1): 0.8,
                (3, 0): 0.76, (3, 1): 0.76, (4, 0): 0.73, (4, 1): 0.73}
-    alpha = {(1, 0): 0.3, (1, 1): 0.3, (2, 0): 0.29, (2, 1): 0.29,
+    alpha = {(1, 0): 0.35, (1, 1): 0.35, (2, 0): 0.29, (2, 1): 0.29,
              (3, 0): 0.29, (3, 1): 0.29, (4, 0): 0.30, (4, 1): 0.30}
+    c = {(1, 0): 1.95, (1, 1): 2.8, (2, 0): 4.6, (2, 1): 4.6,
+               (3, 0): 3.34, (3, 1): 3.34, (4, 0): 4.66, (4, 1): 4.66}
 
     improvement_results = []
 
     # Iterate
     title = 'Items=2, p=4, q=1, High Dependence'
-    cov_rng = [(x * 0.1 * min_y)**2 for x in range(1, 6)]
-
-    for cov_noise in cov_rng:
-        sigma_u = np.eye(k)*cov_noise
-        mu_Y = np.ones(k)*min_y
-        rnd_u, _ = rnd(mu_Y, sigma_u)
-
-        # # Simulate data
-        # varma_generator = varma_data_generator(
-        #     steps, k, cov_noise, model_order[0], model_order[1], min_y, max_rho, alpha
-        # )
-        # data_fit, data_gen = varma_generator.generate_scenarios()
-        # df = {title: data_fit[title]}
-        for p in range(1, 5):
-            for q in range(2):
+    
+    for p in range(1, 5):
+        for q in range(2):
+            cov_rng = [(0.1* x * c[(p,q)])**2 for x in range(1,6)]
+            for cov_noise in cov_rng:
+                sigma_u = np.eye(k)*cov_noise        
                 try:
                     config = {
                         "time_steps": steps,
@@ -63,7 +54,6 @@ def noise_sensitivity_single_run(run_id):
                         "noise_level": cov_noise,
                         "max_rho": max_rho[(p, q)],
                         "alpha": alpha[(p, q)],
-                        'model_order': [p, q]
                     }
                     # Simulate data
                     varma_generator = varma_data_generator(config=config, seed=run_id)
@@ -73,6 +63,9 @@ def noise_sensitivity_single_run(run_id):
                     title = f'Items=2, p={p}, q={q}, High Dependence'
                     df = {title: data_fit[title]}
 
+                    nu =varma_generator.get_mean_y()
+                    #get rnd
+                    rnd_u, _ =rnd(nu, sigma_u)
                     # Iterate over cost items
                     for cost_idx in range(len(cost_params['holding_cost'])):
                         costs = {key: values[cost_idx]
@@ -133,14 +126,19 @@ def noise_level_sensitivity_batch_run(n_run):
     gc.collect()  # Force garbage collection
 
 # plot error against traning size
-
-
 def plot_error(results_df):
-
+    plt.rcParams.update({
+    "font.size": 14,          # base font size
+    "axes.labelsize": 16,     # x and y labels
+    "axes.titlesize": 18,     # title
+    "xtick.labelsize": 14,    # x tick labels
+    "ytick.labelsize": 14     # y tick labels
+})
+   
     # Line plots for Noise Level   
     for metric in ["MAPE", "RMSE", "total_cost", "percentage_improvement"]:
         plt.figure()
-        sns.lineplot(data=results_df, x="RND", y=metric, hue="p", style="q", marker="o", ci=None, palette="deep")
+        sns.lineplot(data=results_df, x="RND", y=metric, hue="p", style="q",markers="o", ci=None, palette="deep")
         # plt.title(f"{metric.capitalize()} vs. Noise Level Ratio")
         plt.xlabel("Relative Noise Dispersion")
         plt.ylabel(metric)

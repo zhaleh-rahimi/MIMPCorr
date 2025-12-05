@@ -2,17 +2,18 @@
 Created on Thu Jan  9 11:04:31 2025
 @author: Zhaleh
 """
+import sys, os
+sys.path.append(os.path.abspath("../"))
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.stats.diagnostic import acorr_ljungbox
+import numpy.linalg as la
 from util.stat_tests import (
     check_stationarity_AR,
     check_invertibility_MA,
     perform_adfuller_test,
 )
-
-
 class varma_data_generator:
     
 
@@ -29,16 +30,19 @@ class varma_data_generator:
         self.min_y = config.get("min_demand", 10)
         self.max_rho = config.get("max_rho", 0.8)
         self.alpha = config.get("alpha", 0.3)
-
+        self.mean_y = np.zeros(self.k) 
+        self.burn_in = 100
         # Noise covariance
         self.sigma_u = np.eye(self.k) * self.sigma_base
         self.base_coeff = self.sigma_base / max(self.min_y, 1e-12)
 
+        self.mode = config.get("mode", "all")  # all, high
         # RNG seed: set global RNG once if provided; store for later
         if seed is not None:
             np.random.seed(seed)
         self.seed = seed
 
+    
     
     def generate_scenarios(self):
         """Wrapper to Generate Scenarios.
@@ -56,26 +60,30 @@ class varma_data_generator:
         phi_matrices_high = self.yule_walker_multivariate(cov_high)
         theta_matrices = self.generate_theta_matrices(k, q)
         title_high = f"Items={k}, p={p}, q={q}, High Dependence"
-
+        self.mean_y = self.find_c_for_target_mu(phi_matrices_high,self.min_y*np.ones(k))
         Y_high, pred_high = self.generate_varma_adjusted(
             phi_matrices_high, theta_matrices, U_base, title_high
         )
         results[title_high] = Y_high
         results_pred[title_high] = pred_high
 
-        # Medium/Low
-        reduction_factors = {"Medium Dependence": 0.5, "Low Dependence": 0.05}
-        for strength_name, reduction_factor in reduction_factors.items():
-            cov_matrices = [self.reduce_dependence(cov, reduction_factor) for cov in cov_high]
-            phi_matrices = self.yule_walker_multivariate(cov_matrices)
-            title = f"Items={k}, p={p}, q={q}, {strength_name}"
-            Y, pred = self.generate_varma_adjusted(phi_matrices, theta_matrices, U_base, title)
-            results[title] = Y
-            results_pred[title] = pred
+        if self.mode == "high":
+            return results, results_pred
+        
+        if self.mode == "all":        
+            # Medium/Low
+            reduction_factors = {"Medium Dependence": 0.5, "Low Dependence": 0.1}
+            for strength_name, reduction_factor in reduction_factors.items():
+                cov_matrices = [self.reduce_dependence(cov, reduction_factor) for cov in cov_high]
+                phi_matrices = self.yule_walker_multivariate(cov_matrices)
+                title = f"Items={k}, p={p}, q={q}, {strength_name}"
+                Y, pred = self.generate_varma_adjusted(phi_matrices, theta_matrices, U_base, title)
+                results[title] = Y
+                results_pred[title] = pred
 
         return results, results_pred
 
-    # ---------- Model building blocks ----------
+   
     def generate_high_dependence_cov(self, max_rho, alpha, reverse=False):
         """Construct a high-dependence covariance structure across lags (p)."""
         phi1 = (
@@ -130,25 +138,35 @@ class varma_data_generator:
     def generate_varma(self, ar_matrices, ma_matrices, U):
         """Generate VARMA process (output: Y, pred = conditional mean)."""
         k, p, q, steps = self.k, self.p, self.q, self.steps
+        burn_in =self.burn_in if U.shape[0] != self.steps else 0
+        steps += burn_in  # to reduce initialization effects
         Y = np.zeros((steps, k))
         pred = np.zeros((steps, k))
-
-        Y[: (max(p, q))] = U[: (max(p, q))]
+        
+        Y[: (max(p, q))] = U[: (max(p, q))] + self.mean_y 
+        pred[: (max(p, q))] = self.mean_y 
+        
         for t in range(max(p, q), steps):
             ar_part = sum(ar_matrices[i] @ Y[t - i - 1] for i in range(p)) if p > 0 else 0
             ma_part = sum(ma_matrices[j] @ U[t - j - 1] for j in range(q)) if q > 0 else 0
-            pred[t] = ar_part + ma_part
-            Y[t] = pred[t] + U[t]
-        return Y, pred
-
+            pred[t] = ar_part + ma_part + self.mean_y
+            Y[t] = pred[t] + U[t] 
+        
+        return Y[burn_in:], pred[burn_in:]
+    
+    def get_mean_y(self):
+        return self.mean_y
+    
     def get_conditional_mean(self, ar_matrices, ma_matrices,U, title):
         """Generate a VARMA process with coefficient checks and ADF-based stationarity enforcement."""
         # Generate
+        self.mean_y = self.find_c_for_target_mu(ar_matrices,self.min_y*np.ones(self.k))
         Y, pred = self.generate_varma(ar_matrices, ma_matrices, U)
 
         # Check invertibility for VMA
         is_invertible = check_invertibility_MA(ma_matrices) if self.q > 0 else True
         is_stationary = check_stationarity_AR(ar_matrices)
+        
         if is_stationary and is_invertible:
             # Enforce positivity
             _, mu = self.enforce_positivity(Y, pred)
@@ -197,6 +215,7 @@ class varma_data_generator:
         """Autocorrelation matrices for lags 0..max_lag."""
         n_samples, n_variables = Y.shape
         autocov_matrices = []
+        Y = Y - np.mean(Y, axis=0)
         for lag in range(max_lag + 1):
             Gamma_k = np.zeros((n_variables, n_variables))
             for t in range(lag, n_samples):
@@ -206,13 +225,13 @@ class varma_data_generator:
         Gamma_0 = autocov_matrices[0]
         autocorr_matrices = []
         D = np.diag(np.diag(Gamma_0))
-        # numerical safety: avoid sqrt of zeros on diagonal
+        # avoid sqrt of zeros on diagonal
         D_safe = np.where(D > 0, D, 1e-12)
         D_inv_sqrt = np.linalg.inv(np.sqrt(D_safe))
         for Gamma_k in autocov_matrices:
             rho_k = D_inv_sqrt @ Gamma_k @ D_inv_sqrt
             autocorr_matrices.append(rho_k)
-        return autocorr_matrices
+        return np.round(autocorr_matrices, decimals=4)
 
     def adjust_coefficients(self, coefficients, check_func, scaling_factor=0.97, max_attempts=10**3):
         """Scale down coefficients until constraint passes or attempts run out."""
@@ -227,7 +246,7 @@ class varma_data_generator:
 
     def generate_uncorrelated_noise(self, mean, seed):
         """Draw multivariate Gaussian noise and Ljung–Box filter for serial correlation."""
-        cov, n_samples, n_dims = self.sigma_u, self.steps, self.k
+        cov, n_samples, n_dims = self.sigma_u, self.steps+self.burn_in, self.k
         if seed is not None:
             np.random.seed(seed)
         noise = np.random.multivariate_normal(mean, cov, size=n_samples)
@@ -237,6 +256,7 @@ class varma_data_generator:
                 # v1-like: bump the seed to change the RNG stream deterministically
                 next_seed = (seed + 1) if (seed is not None) else None
                 return self.generate_uncorrelated_noise(mean, next_seed)
+       
         return noise
 
     def enforce_stationarity_adf(
@@ -270,13 +290,25 @@ class varma_data_generator:
             Y, pred = self.generate_varma(ar_matrices, ma_matrics, U)
             attempts += 1
 
-        print(f"Failed to enforce stationarity after {max_attempts} attempts for {title}.")
+        # print(f"Failed to enforce stationarity after {max_attempts} attempts for {title}.")
         return Y, pred, ar_matrices, False
 
     def enforce_positivity(self, Y, pred):
-        """Pure upward shift by min_y"""
-        shift = self.min_y
-        return Y + shift, pred + shift
+        # Y_pos = np.maximum(Y, 0)
+        # pred_pos = np.maximum(pred, 0)
+
+        # Compute column-wise minimums for Y and pred
+        min_Y = np.min(Y, axis=0)
+        min_pred = np.min(pred, axis=0)
+
+        # Determine shifts for columns where positivity needs to be enforced
+        shifts = np.maximum(0, -(np.maximum(min_Y, min_pred)) + self.mean_y)
+
+        # Apply the shifts to all rows for each column
+        Y_pos = Y + shifts
+        pred_pos = pred + shifts
+       
+        return Y_pos, pred_pos
 
     def save_scenario_results(
         self, scenario, ar_matrices, ma_matrices, stationary, invertible, autocor_matrices
@@ -313,3 +345,60 @@ class varma_data_generator:
             return matches.to_dict(orient="records")
         else:
             return matches.iloc[-1].to_dict()
+    def find_c_for_target_mu(self, A_matrices, target_mu: np.ndarray) -> np.ndarray:
+        """
+        Find intercept vector c so that the process converges to mean μ:
+            μ = c + Φ₁ μ + ... + Φₚ μ  →  c = (I − ΣΦᵢ) μ
+        A_matrices should be a list/array of (k,k) AR coefficient matrices.
+        """
+        n = self.k  
+        p = self.p
+       
+        # build (I − ΣΦᵢ)
+        coeff_matrix = np.eye(n, dtype=float)
+        for i in range(p):
+            coeff_matrix -= np.array(A_matrices[i], copy=True)
+
+        # safety: ensure it's invertible
+        if abs(la.det(coeff_matrix)) < 1e-12:
+            raise ValueError("Coefficient matrix is singular — VAR coefficients too large or non-stationary.")
+
+        # compute c
+        c_vector = coeff_matrix @ target_mu
+        return c_vector
+
+# Test usage
+
+if __name__ == "__main__":
+    sigma2 = (1 * 0.1 * 5)**2 
+    config = {
+        "time_steps": 200,
+        "num_products": 2,
+        "model_order": [1, 1],
+        "min_demand": 10,
+        "noise_level": sigma2,
+        "max_rho": 0.73,
+        "alpha": 0.3,
+        'mode': 'high'
+    }
+    generator = varma_data_generator(config, seed=42)
+    data_fit, data_gen = generator.generate_scenarios()
+    df = {title: data_fit[title] for title in data_fit}
+    
+    #plot series  
+    import matplotlib.pyplot as plt
+    for title, data in data_fit.items():
+        #print cross-correlation matrices
+        results = generator.get_scenario_by_title(title)
+       
+        print(results)
+        print(f"mean demand for {title}: {np.mean(data, axis=0)}")
+
+        c = generator.find_c_for_target_mu(results['AR Coefficients'],np.array([10, 10]))
+        print(f"intercept c for mean demand 10: {c}")
+        plt.figure(figsize=(10, 6))
+        plt.plot(data)
+        plt.title(title)
+        plt.xlabel('Time')
+        plt.ylabel('Demand')
+        plt.show()

@@ -1,4 +1,4 @@
-# MIMPCorr: Multi-Item Multi-Period Correlated-aware Inventory Optimization
+# MIMPCorr: Multi-Item Multi-Period Correlation-aware Inventory Optimization
 
 
 ## Abstract

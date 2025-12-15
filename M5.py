@@ -249,10 +249,7 @@ def run_total_costs_by_ratio(weekly_df, clusters, config, cost_ratios=[0.1, 1.0,
     return pd.DataFrame(results)
 
 def safe_one_step_forecast(window_df: pd.DataFrame, p: int, q: int, model_type: str, exog_window: pd.DataFrame = None, exog_forecast: pd.DataFrame = None):
-    """
-    Now accepts exog_window (same index as window_df) and exog_forecast (1-row DF for next step).
-    Returns (mu_vec, sigma_vec).
-    """
+    
     W = window_df.replace([np.inf, -np.inf], np.nan).fillna(method='ffill').fillna(method='bfill').fillna(0.0)
     last = W.values[-1, :]
     diffs = W.diff().dropna()
@@ -268,22 +265,14 @@ def safe_one_step_forecast(window_df: pd.DataFrame, p: int, q: int, model_type: 
     Z = (W - mean_) / std_
     Z = Z.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
-    # prepare exog (standardize if needed) - must align rows
-    exog_for_fit = None
-    exog_for_pred = None
-    if exog_window is not None:
-        # ensure same index length and order
-        exog_for_fit = exog_window.reindex(window_df.index).fillna(0.0)
-    if exog_forecast is not None:
-        # one-row df, index aligned to forecast date
-        exog_for_pred = exog_forecast
+    
 
     try:
         if model_type.upper() == "VARMAX":
-            # statsmodels VARMAX accepts exog for fit and for forecast; we provide exog for fit and exog for forecast via 'exog' and 'exog_future'
+            
             model = VARMAX(
                 Z,
-                exog=exog_for_fit,
+            
                 order=(p, q),
                 trend='c',
                 enforce_stationarity=True,
@@ -305,10 +294,8 @@ def safe_one_step_forecast(window_df: pd.DataFrame, p: int, q: int, model_type: 
             if res is None:
                 res = model.fit(disp=False)
 
-            if exog_for_pred is not None:
-                fc = res.get_forecast(steps=1, exog=exog_for_pred)
-            else:
-                fc = res.get_forecast(steps=1)
+           
+            fc = res.get_forecast(steps=1)
 
             mu_scaled = fc.predicted_mean.iloc[0].to_numpy(dtype=float)
             try:
@@ -319,7 +306,7 @@ def safe_one_step_forecast(window_df: pd.DataFrame, p: int, q: int, model_type: 
                 sigma_scaled = eps.std(axis=0, ddof=1)
 
         else:
-            # plain VAR (no exog)
+            
             var = VAR(Z).fit(maxlags=p, ic=None, trend='c')
             mu_scaled = var.forecast(y=Z.to_numpy()[-p:], steps=1)[0]
             resid = var.resid.to_numpy() if hasattr(var, "resid") else (Z.to_numpy() - var.fittedvalues.to_numpy())

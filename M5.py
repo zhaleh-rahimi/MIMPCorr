@@ -5,9 +5,7 @@
 #
 # Notes:
 # - This is a scalable reference implementation with conservative defaults.
-# - For actual VARMA, you can switch model_type="VARMAX" below. VARMAX can be brittle;
-#   start with small p,q and short clusters.
-# - This code uses diagonal innovation variance for safety-stock (per-item sigma).
+# - For actual VARMA, you can switch model_type="VARMAX" below. start with small p,q and short clusters.
 # - The evaluation uses a rolling-origin split with periodic refits.
 # - You can adjust cost ratios, correlation thresholds, and cluster sizes at the CONFIG block.
 #

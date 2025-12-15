@@ -246,7 +246,7 @@ def run_total_costs_by_ratio(weekly_df, clusters, config, cost_ratios=[0.1, 1.0,
                         "improvement_pct": (total_arma - total_cluster) / max(total_arma,1e-9)*100.0})
     return pd.DataFrame(results)
 
-def safe_one_step_forecast(window_df: pd.DataFrame, p: int, q: int, model_type: str, exog_window: pd.DataFrame = None, exog_forecast: pd.DataFrame = None):
+def one_step_forecast(window_df: pd.DataFrame, p: int, q: int, model_type: str, exog_window: pd.DataFrame = None, exog_forecast: pd.DataFrame = None):
     
     W = window_df.replace([np.inf, -np.inf], np.nan).fillna(method='ffill').fillna(method='bfill').fillna(0.0)
     last = W.values[-1, :]
@@ -380,7 +380,7 @@ def run_cluster_policy_cost(weekly_df: pd.DataFrame, items: List[str], config: d
         
 
 
-        mu_vec, sigma_vec = safe_one_step_forecast(window, p=config["p_order"], q=config["q_order"], 
+        mu_vec, sigma_vec = one_step_forecast(window, p=config["p_order"], q=config["q_order"], 
                                                    model_type=config["model_type"])
         y_star = order_up_to_levels(mu_vec, sigma_vec, h, s)
         d_real = full[end_idx, :]
